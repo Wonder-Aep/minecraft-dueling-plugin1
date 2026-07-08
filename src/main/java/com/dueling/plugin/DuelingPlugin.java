@@ -5,45 +5,38 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.dueling.plugin.managers.ArenaManager;
 import com.dueling.plugin.managers.MatchHandler;
 import com.dueling.plugin.managers.ConfigManager;
+import com.dueling.plugin.managers.GUIManager; // IMPORT THIS
 import com.dueling.plugin.commands.DuelCommand;
 import com.dueling.plugin.listeners.PlayerInteractionListener;
 import com.dueling.plugin.listeners.PlayerDeathListener;
 import com.dueling.plugin.listeners.BlockBreakListener;
 
-/**
- * Main plugin class for the Dueling system
- * Handles initialization and registration of all managers and listeners
- */
 public class DuelingPlugin extends JavaPlugin {
 
     private static DuelingPlugin instance;
     private ArenaManager arenaManager;
     private MatchHandler matchHandler;
     private ConfigManager configManager;
+    private GUIManager guiManager; // ADD THIS FIELD
     private DuelCommand duelCommand;
 
     @Override
     public void onEnable() {
         instance = this;
         
-        // Initialize config
         configManager = new ConfigManager(this);
         configManager.loadConfig();
-        getLogger().info("Config loaded successfully");
 
-        // Initialize managers
         arenaManager = new ArenaManager(this);
         matchHandler = new MatchHandler(this);
         
-        getLogger().info("Managers initialized successfully");
-
-        // Initialize command
+        // INITIALIZE GUIMANAGER HERE
+        guiManager = new GUIManager(this); 
+        
         duelCommand = new DuelCommand(this);
 
-        // Register commands
         getCommand("duel").setExecutor(duelCommand);
         
-        // Register listeners
         Bukkit.getPluginManager().registerEvents(new PlayerInteractionListener(this, duelCommand), this);
         Bukkit.getPluginManager().registerEvents(new PlayerDeathListener(this), this);
         Bukkit.getPluginManager().registerEvents(new BlockBreakListener(this), this);
@@ -56,26 +49,12 @@ public class DuelingPlugin extends JavaPlugin {
         if (matchHandler != null) {
             matchHandler.cancelAllMatches();
         }
-        getLogger().info("\u00a7c[Dueling Plugin] Plugin disabled!");
     }
 
-    public static DuelingPlugin getInstance() {
-        return instance;
-    }
-
-    public ArenaManager getArenaManager() {
-        return arenaManager;
-    }
-
-    public MatchHandler getMatchHandler() {
-        return matchHandler;
-    }
-
-    public ConfigManager getConfigManager() {
-        return configManager;
-    }
-
-    public DuelCommand getDuelCommand() {
-        return duelCommand;
-    }
+    public static DuelingPlugin getInstance() { return instance; }
+    public ArenaManager getArenaManager() { return arenaManager; }
+    public MatchHandler getMatchHandler() { return matchHandler; }
+    public ConfigManager getConfigManager() { return configManager; }
+    public GUIManager getGuiManager() { return guiManager; } // ADD THIS GETTER
+    public DuelCommand getDuelCommand() { return duelCommand; }
 }
