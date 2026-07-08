@@ -2,11 +2,11 @@ package com.dueling.plugin.managers;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 import com.dueling.plugin.DuelingPlugin;
-import net.essentialsx.api.v2.Essentials;
 
 import java.util.*;
 
@@ -20,9 +20,33 @@ public class MatchHandler {
     private Map<Player, String> pendingDuelRequests = new HashMap<>();
     private Map<Player, String> pendingDrawRequests = new HashMap<>();
     private Map<Player, List<ItemStack>> playerInventoryBackup = new HashMap<>();
+    private boolean essentialsAvailable = false;
+
+    // Custom spawn location when EssentialsX is not installed
+    private static final double SPAWN_X = -21;
+    private static final double SPAWN_Y = 203;
+    private static final double SPAWN_Z = -44;
 
     public MatchHandler(DuelingPlugin plugin) {
         this.plugin = plugin;
+        this.essentialsAvailable = checkEssentialsAvailable();
+    }
+
+    /**
+     * Check if EssentialsX is available
+     */
+    private boolean checkEssentialsAvailable() {
+        try {
+            org.bukkit.plugin.Plugin essentialsPlugin = Bukkit.getPluginManager().getPlugin("Essentials");
+            if (essentialsPlugin != null && essentialsPlugin.isEnabled()) {
+                Class.forName("net.essentialsx.api.v2.Essentials");
+                plugin.getLogger().info("✓ EssentialsX detected - will teleport to Essentials spawn");
+                return true;
+            }
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().info("✗ EssentialsX not found - will use custom spawn at -21, 203, -44");
+        }
+        return false;
     }
 
     /**
@@ -91,7 +115,6 @@ public class MatchHandler {
             String arenaName = arenas.keySet().iterator().next();
             openTimeLimitGUI(player1, player2, arenaName);
         } else {
-            // Open arena selection GUI
             GUIManager.openArenaSelectionGUI(plugin, player1, player2);
         }
     }
@@ -125,10 +148,7 @@ public class MatchHandler {
         Match match = new Match(matchId, player1, player2, arena, timeLimitSeconds, plugin);
         activeMatches.put(matchId, match);
 
-        // Snapshot the arena
         plugin.getArenaManager().snapshotArena(arenaName);
-
-        // Start countdown
         match.startCountdown();
     }
 
@@ -142,35 +162,67 @@ public class MatchHandler {
         winner.sendMessage("§a§lYou won the duel! You have 60 seconds to pick up loot.");
         winner.sendMessage("§eType §a/duel leave §eto return to spawn");
 
-        // Schedule auto-return to spawn after 60 seconds
         Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
             if (winner.isOnline()) {
                 returnToSpawn(winner);
             }
             plugin.getArenaManager().restoreArena(match.arena.getName());
             activeMatches.remove(matchId);
-        }, 1200L); // 60 seconds
+        }, 1200L);
 
-        // Remove loser from arena
         if (loser.isOnline()) {
             loser.teleport(Bukkit.getWorld("world").getSpawnLocation());
         }
     }
 
     /**
-     * Returns a player to spawn (integrates with EssentialsX)
+     * Returns a player to spawn
+     * Uses EssentialsX spawn if available, otherwise uses custom spawn at -21, 203, -44
      */
     private void returnToSpawn(Player player) {
+        if (essentialsAvailable) {
+            if (teleportToEssentialsSpawn(player)) {
+                return;
+            }
+        }
+
+        // Fallback to custom spawn location
+        World world = Bukkit.getWorld("world");
+        if (world != null) {
+            Location customSpawn = new Location(world, SPAWN_X, SPAWN_Y, SPAWN_Z);
+            player.teleport(customSpawn);
+            player.sendMessage("§aReturned to spawn at -21, 203, -44!");
+        }
+    }
+
+    /**
+     * Attempt to teleport player to EssentialsX spawn
+     */
+    private boolean teleportToEssentialsSpawn(Player player) {
         try {
-            Essentials ess = (Essentials) Bukkit.getPluginManager().getPlugin("Essentials");
-            if (ess != null) {
-                player.teleport(ess.getUsers().getUser(player.getUniqueId()).getHome("home"));
-                player.sendMessage("§aReturned to spawn!");
+            org.bukkit.plugin.Plugin essentialsPlugin = Bukkit.getPluginManager().getPlugin("Essentials");
+            if (essentialsPlugin == null || !essentialsPlugin.isEnabled()) {
+                return false;
+            }
+
+            // Use reflection to get spawn location from EssentialsX
+            Class<?> essentialsClass = Class.forName("net.essentialsx.api.v2.Essentials");
+            Object essentials = essentialsClass.cast(essentialsPlugin);
+
+            // Get spawn method
+            java.lang.reflect.Method getSpawnMethod = essentialsClass.getMethod("getSpawn", String.class);
+            Location spawn = (Location) getSpawnMethod.invoke(essentials, "world");
+
+            if (spawn != null) {
+                player.teleport(spawn);
+                player.sendMessage("§aReturned to Essentials spawn!");
+                return true;
             }
         } catch (Exception e) {
-            // Fallback to world spawn
-            player.teleport(player.getWorld().getSpawnLocation());
+            plugin.getLogger().warning("Error teleporting to EssentialsX spawn: " + e.getMessage());
         }
+
+        return false;
     }
 
     /**
@@ -321,7 +373,6 @@ public class MatchHandler {
          * Starts the actual match
          */
         private void startMatch() {
-            // Teleport players to arena center
             Location spawn1 = arena.getPos1().clone().add(2, 0.5, 2);
             Location spawn2 = arena.getPos2().clone().add(-2, 0.5, -2);
 
@@ -331,7 +382,6 @@ public class MatchHandler {
             player1.sendMessage("§a§lMatch started! Time limit: " + timeLimitSeconds + " seconds");
             player2.sendMessage("§a§lMatch started! Time limit: " + timeLimitSeconds + " seconds");
 
-            // Start match timer
             matchTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
                 timeLimitSeconds--;
 
