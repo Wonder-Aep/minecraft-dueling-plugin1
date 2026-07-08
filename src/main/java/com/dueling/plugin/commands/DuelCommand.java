@@ -17,8 +17,8 @@ import java.util.Map;
 public class DuelCommand implements CommandExecutor {
 
     private final DuelingPlugin plugin;
-    private final Map<Player, org.bukkit.Location> playerPos1 = new HashMap<>();
-    private final Map<Player, org.bukkit.Location> playerPos2 = new HashMap<>();
+    private final Map<String, org.bukkit.Location> playerPos1 = new HashMap<>();
+    private final Map<String, org.bukkit.Location> playerPos2 = new HashMap<>();
 
     public DuelCommand(DuelingPlugin plugin) {
         this.plugin = plugin;
@@ -138,18 +138,21 @@ public class DuelCommand implements CommandExecutor {
     }
 
     private void setArena(Player player, String arenaName) {
-        org.bukkit.Location pos1 = playerPos1.get(player);
-        org.bukkit.Location pos2 = playerPos2.get(player);
+        String playerUUID = player.getUniqueId().toString();
+        org.bukkit.Location pos1 = playerPos1.get(playerUUID);
+        org.bukkit.Location pos2 = playerPos2.get(playerUUID);
         
         if (pos1 == null || pos2 == null) {
             player.sendMessage("§cPlease set both positions first using the wand");
+            player.sendMessage("§cPos1: " + (pos1 == null ? "Not set" : "Set"));
+            player.sendMessage("§cPos2: " + (pos2 == null ? "Not set" : "Set"));
             return;
         }
 
         plugin.getArenaManager().saveArena(arenaName, pos1, pos2);
         player.sendMessage("§aArena '" + arenaName + "' has been saved!");
-        playerPos1.remove(player);
-        playerPos2.remove(player);
+        playerPos1.remove(playerUUID);
+        playerPos2.remove(playerUUID);
     }
 
     private void setSpawn1(Player player) {
@@ -186,10 +189,14 @@ public class DuelCommand implements CommandExecutor {
     }
 
     public void storePos1(Player player, org.bukkit.Location location) {
-        playerPos1.put(player, location);
+        String playerUUID = player.getUniqueId().toString();
+        playerPos1.put(playerUUID, location);
+        plugin.getLogger().info("Stored Pos1 for " + player.getName() + " at " + location);
     }
 
     public void storePos2(Player player, org.bukkit.Location location) {
-        playerPos2.put(player, location);
+        String playerUUID = player.getUniqueId().toString();
+        playerPos2.put(playerUUID, location);
+        plugin.getLogger().info("Stored Pos2 for " + player.getName() + " at " + location);
     }
 }
