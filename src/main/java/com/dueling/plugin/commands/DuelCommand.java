@@ -54,11 +54,19 @@ public class DuelCommand implements CommandExecutor {
                 return true;
 
             case "setspawn1":
-                setSpawn1(player);
+                if (args.length < 2) {
+                    player.sendMessage("§cUsage: /duel setspawn1 <arena>");
+                    return true;
+                }
+                setSpawn1(player, args[1]);
                 return true;
 
             case "setspawn2":
-                setSpawn2(player);
+                if (args.length < 2) {
+                    player.sendMessage("§cUsage: /duel setspawn2 <arena>");
+                    return true;
+                }
+                setSpawn2(player, args[1]);
                 return true;
 
             case "reload":
@@ -117,6 +125,8 @@ public class DuelCommand implements CommandExecutor {
         player.sendMessage("§e/duel <player> - Challenge a player");
         player.sendMessage("§e/duel wand - Get the selection wand");
         player.sendMessage("§e/duel setarena <name> - Set arena from positions");
+        player.sendMessage("§e/duel setspawn1 <arena> - Set spawn 1 for arena");
+        player.sendMessage("§e/duel setspawn2 <arena> - Set spawn 2 for arena");
         player.sendMessage("§e/duel accept - Accept a duel request");
         player.sendMessage("§e/duel deny - Deny a duel request");
         player.sendMessage("§e/duel draw - Request a draw");
@@ -155,12 +165,32 @@ public class DuelCommand implements CommandExecutor {
         playerPos2.remove(playerUUID);
     }
 
-    private void setSpawn1(Player player) {
-        player.sendMessage("§aSpawn 1 set to your current location");
+    private void setSpawn1(Player player, String arenaName) {
+        // Check if arena exists
+        if (plugin.getArenaManager().getArena(arenaName) == null) {
+            player.sendMessage("§cArena '" + arenaName + "' does not exist");
+            return;
+        }
+
+        // Update spawn1 for the arena
+        org.bukkit.Location currentLoc = player.getLocation();
+        plugin.getArenaManager().updateSpawn1(arenaName, currentLoc);
+        player.sendMessage("§aSpawn 1 for arena '" + arenaName + "' set to your current location");
+        player.sendMessage("§7Location: " + currentLoc.getBlockX() + ", " + currentLoc.getBlockY() + ", " + currentLoc.getBlockZ());
     }
 
-    private void setSpawn2(Player player) {
-        player.sendMessage("§aSpawn 2 set to your current location");
+    private void setSpawn2(Player player, String arenaName) {
+        // Check if arena exists
+        if (plugin.getArenaManager().getArena(arenaName) == null) {
+            player.sendMessage("§cArena '" + arenaName + "' does not exist");
+            return;
+        }
+
+        // Update spawn2 for the arena
+        org.bukkit.Location currentLoc = player.getLocation();
+        plugin.getArenaManager().updateSpawn2(arenaName, currentLoc);
+        player.sendMessage("§aSpawn 2 for arena '" + arenaName + "' set to your current location");
+        player.sendMessage("§7Location: " + currentLoc.getBlockX() + ", " + currentLoc.getBlockY() + ", " + currentLoc.getBlockZ());
     }
 
     private void reloadConfig(Player player) {
