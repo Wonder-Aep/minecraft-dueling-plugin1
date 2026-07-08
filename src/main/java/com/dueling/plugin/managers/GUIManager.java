@@ -1,182 +1,232 @@
-package com.dueling.plugin.managers;
+package com.dueling.plugin.commands;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import com.dueling.plugin.DuelingPlugin;
+import com.dueling.plugin.managers.MatchHandler;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Manages all GUI interactions for the dueling system
+ * Main command handler for all /duel commands
  */
-public class GUIManager implements Listener {
+public class DuelCommand implements CommandExecutor {
 
-    private static final String ARENA_SELECT_PREFIX = "arena_select_";
-    private static final String TIME_LIMIT_PREFIX = "time_limit_";
-    private static final String CONFIRM_PREFIX = "confirm_";
-    
-    private static GUIManager instance;
-    private DuelingPlugin plugin;
-    private Map<String, String> pendingArenaSelections = new HashMap<>();
-    private Map<String, String> pendingTimeLimitSelections = new HashMap<>();
+    private final DuelingPlugin plugin;
+    private final Map<String, org.bukkit.Location> playerPos1 = new HashMap<>();
+    private final Map<String, org.bukkit.Location> playerPos2 = new HashMap<>();
 
-    public GUIManager(DuelingPlugin plugin) {
+    public DuelCommand(DuelingPlugin plugin) {
         this.plugin = plugin;
-        instance = this;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
-    /**
-     * Opens arena selection GUI
-     */
-    public static void openArenaSelectionGUI(DuelingPlugin plugin, Player player1, Player player2) {
-        Inventory inv = Bukkit.createInventory(null, 27, "§eSelect an Arena");
-
-        int slot = 0;
-        for (ArenaManager.Arena arena : plugin.getArenaManager().getAllArenas().values()) {
-            ItemStack item = createItemStack(Material.GRASS_BLOCK, arena.getName(), "");
-            inv.setItem(slot++, item);
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Only players can execute this command");
+            return true;
         }
 
-        String key = player1.getUniqueId() + ":" + player2.getUniqueId();
-        instance.pendingArenaSelections.put(key, "");
-        player1.openInventory(inv);
+        Player player = (Player) sender;
+
+        if (args.length == 0) {
+            showDuelMainMenu(player);
+            return true;
+        }
+
+        String subcommand = args[0].toLowerCase();
+
+        switch (subcommand) {
+            case "wand":
+                giveDuelingWand(player);
+                return true;
+
+            case "setarena":
+                if (args.length < 2) {
+                    player.sendMessage("§cUsage: /duel setarena <name>");
+                    return true;
+                }
+                setArena(player, args[1]);
+                return true;
+
+            case "setspawn1":
+                if (args.length < 2) {
+                    player.sendMessage("§cUsage: /duel setspawn1 <arena>");
+                    return true;
+                }
+                setSpawn1(player, args[1]);
+                return true;
+
+            case "setspawn2":
+                if (args.length < 2) {
+                    player.sendMessage("§cUsage: /duel setspawn2 <arena>");
+                    return true;
+                }
+                setSpawn2(player, args[1]);
+                return true;
+
+            case "reload":
+                reloadConfig(player);
+                return true;
+
+            case "spectate":
+                spectate(player, args.length > 1 ? args[1] : null);
+                return true;
+
+            case "draw":
+                sendDraw(player);
+                return true;
+
+            case "acceptdraw":
+                plugin.getMatchHandler().acceptDraw(player);
+                return true;
+
+            case "denydraw":
+                plugin.getMatchHandler().denyDraw(player);
+                return true;
+
+            case "accept":
+                plugin.getMatchHandler().acceptDuelRequest(player);
+                return true;
+
+            case "deny":
+                plugin.getMatchHandler().denyDuelRequest(player);
+                return true;
+
+            case "leave":
+                plugin.getMatchHandler().leaveMatch(player);
+                return true;
+
+            case "editarena":
+                if (args.length < 2) {
+                    player.sendMessage("§cUsage: /duel editarena <name>");
+                    return true;
+                }
+                editArena(player, args[1]);
+                return true;
+
+            default:
+                Player target = Bukkit.getPlayer(args[0]);
+                if (target == null) {
+                    player.sendMessage("§cPlayer not found");
+                    return true;
+                }
+                plugin.getMatchHandler().sendDuelRequest(player, target);
+                return true;
+        }
     }
 
-    /**
-     * Opens time limit selection GUI
-     */
-    public static void openTimeLimitGUI(DuelingPlugin plugin, Player player1, Player player2, String arenaName) {
-        Inventory inv = Bukkit.createInventory(null, 9, "§eSelect Time Limit");
-
-        ItemStack item3min = createItemStack(Material.CLOCK, "3 Minutes", "§7180 seconds");
-        ItemStack item5min = createItemStack(Material.CLOCK, "5 Minutes", "§7300 seconds");
-        ItemStack item10min = createItemStack(Material.CLOCK, "10 Minutes", "§7600 seconds");
-
-        inv.setItem(2, item3min);
-        inv.setItem(4, item5min);
-        inv.setItem(6, item10min);
-
-        String key = player1.getUniqueId() + ":" + player2.getUniqueId();
-        instance.pendingTimeLimitSelections.put(key, arenaName);
-        player1.openInventory(inv);
+    private void showDuelMainMenu(Player player) {
+        player.sendMessage("§e=== Duel Menu §e===");
+        player.sendMessage("§e/duel <player> - Challenge a player");
+        player.sendMessage("§e/duel wand - Get the selection wand");
+        player.sendMessage("§e/duel setarena <name> - Set arena from positions");
+        player.sendMessage("§e/duel setspawn1 <arena> - Set spawn 1 for arena");
+        player.sendMessage("§e/duel setspawn2 <arena> - Set spawn 2 for arena");
+        player.sendMessage("§e/duel accept - Accept a duel request");
+        player.sendMessage("§e/duel deny - Deny a duel request");
+        player.sendMessage("§e/duel draw - Request a draw");
+        player.sendMessage("§e/duel acceptdraw - Accept draw");
+        player.sendMessage("§e/duel denydraw - Deny draw");
+        player.sendMessage("§e/duel leave - Leave after duel");
     }
 
-    /**
-     * Opens confirmation GUI
-     */
-    public static void openConfirmationGUI(DuelingPlugin plugin, Player player1, Player player2, String arenaName, int timeLimit) {
-        Inventory inv = Bukkit.createInventory(null, 27, "§eConfirm Duel");
-
-        // Display info
-        ItemStack infoItem = createItemStack(Material.PAPER, "§eDuel Information", 
-            "§7Player 1: " + player1.getName() + 
-            "\n§7Player 2: " + player2.getName() +
-            "\n§7Time Limit: " + timeLimit + "s" +
-            "\n§7Ping P1: " + player1.getPing() + "ms" +
-            "\n§7Ping P2: " + player2.getPing() + "ms" +
-            "\n§7Arena: " + arenaName);
-        
-        inv.setItem(13, infoItem);
-
-        // Confirm button (Green Glass Pane)
-        ItemStack confirmItem = createItemStack(Material.GREEN_STAINED_GLASS_PANE, "§aConfirm", "§7Click to start the duel");
-        inv.setItem(11, confirmItem);
-
-        // Cancel button (Red Glass Pane)
-        ItemStack cancelItem = createItemStack(Material.RED_STAINED_GLASS_PANE, "§cCancel", "§7Click to cancel");
-        inv.setItem(15, cancelItem);
-
-        player1.openInventory(inv);
-    }
-
-    /**
-     * Creates an ItemStack with name and lore
-     */
-    private static ItemStack createItemStack(Material material, String name, String lore) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
+    private void giveDuelingWand(Player player) {
+        org.bukkit.inventory.ItemStack wand = new org.bukkit.inventory.ItemStack(org.bukkit.Material.IRON_HOE);
+        org.bukkit.inventory.meta.ItemMeta meta = wand.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(name);
-            if (!lore.isEmpty()) {
-                meta.setLore(Collections.singletonList(lore));
-            }
-            item.setItemMeta(meta);
+            meta.setDisplayName("§eDueling Wand");
+            meta.setLore(java.util.Collections.singletonList("§7Left-click: Set pos1 | Right-click: Set pos2"));
+            wand.setItemMeta(meta);
         }
-        return item;
+        player.getInventory().addItem(wand);
+        player.sendMessage("§aWand added to inventory");
     }
 
-    /**
-     * Single event handler for all GUI interactions
-     */
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        Player player = (Player) event.getWhoClicked();
-        String title = event.getView().getTitle();
+    private void setArena(Player player, String arenaName) {
+        String playerUUID = player.getUniqueId().toString();
+        org.bukkit.Location pos1 = playerPos1.get(playerUUID);
+        org.bukkit.Location pos2 = playerPos2.get(playerUUID);
         
-        if (title.contains("Select an Arena")) {
-            event.setCancelled(true);
-            ItemStack clicked = event.getCurrentItem();
-            if (clicked == null || !clicked.hasItemMeta()) return;
-
-            String arenaName = clicked.getItemMeta().getDisplayName();
-            
-            // Find player2 from pending selections
-            for (String key : pendingArenaSelections.keySet()) {
-                String[] parts = key.split(":");
-                if (parts[0].equals(player.getUniqueId().toString())) {
-                    Player player2 = Bukkit.getPlayer(java.util.UUID.fromString(parts[1]));
-                    if (player2 != null) {
-                        openTimeLimitGUI(plugin, player, player2, arenaName);
-                        pendingArenaSelections.remove(key);
-                    }
-                    return;
-                }
-            }
-        } 
-        else if (title.contains("Select Time Limit")) {
-            event.setCancelled(true);
-            int slot = event.getRawSlot();
-            int timeLimit = 0;
-
-            if (slot == 2) timeLimit = 180;      // 3 minutes
-            else if (slot == 4) timeLimit = 300; // 5 minutes
-            else if (slot == 6) timeLimit = 600; // 10 minutes
-
-            if (timeLimit > 0) {
-                // Find player2 and arenaName from pending selections
-                for (String key : pendingTimeLimitSelections.keySet()) {
-                    String[] parts = key.split(":");
-                    if (parts[0].equals(player.getUniqueId().toString())) {
-                        Player player2 = Bukkit.getPlayer(java.util.UUID.fromString(parts[1]));
-                        String arenaName = pendingTimeLimitSelections.get(key);
-                        if (player2 != null) {
-                            openConfirmationGUI(plugin, player, player2, arenaName, timeLimit);
-                            pendingTimeLimitSelections.remove(key);
-                        }
-                        return;
-                    }
-                }
-            }
+        if (pos1 == null || pos2 == null) {
+            player.sendMessage("§cPlease set both positions first using the wand");
+            player.sendMessage("§cPos1: " + (pos1 == null ? "Not set" : "Set"));
+            player.sendMessage("§cPos2: " + (pos2 == null ? "Not set" : "Set"));
+            return;
         }
-        else if (title.contains("Confirm Duel")) {
-            event.setCancelled(true);
-            int slot = event.getRawSlot();
-            
-            if (slot == 11 || slot == 15) {
-                // Get both players from the inventory - this is tricky, so we'll need to track it
-                // For now, just close and cancel
-                player.closeInventory();
-            }
+
+        plugin.getArenaManager().saveArena(arenaName, pos1, pos2);
+        player.sendMessage("§aArena '" + arenaName + "' has been saved!");
+        playerPos1.remove(playerUUID);
+        playerPos2.remove(playerUUID);
+    }
+
+    private void setSpawn1(Player player, String arenaName) {
+        // Check if arena exists
+        if (plugin.getArenaManager().getArena(arenaName) == null) {
+            player.sendMessage("§cArena '" + arenaName + "' does not exist");
+            return;
         }
+
+        // Update spawn1 for the arena
+        org.bukkit.Location currentLoc = player.getLocation();
+        plugin.getArenaManager().updateSpawn1(arenaName, currentLoc);
+        player.sendMessage("§aSpawn 1 for arena '" + arenaName + "' set to your current location");
+        player.sendMessage("§7Location: " + currentLoc.getBlockX() + ", " + currentLoc.getBlockY() + ", " + currentLoc.getBlockZ());
+    }
+
+    private void setSpawn2(Player player, String arenaName) {
+        // Check if arena exists
+        if (plugin.getArenaManager().getArena(arenaName) == null) {
+            player.sendMessage("§cArena '" + arenaName + "' does not exist");
+            return;
+        }
+
+        // Update spawn2 for the arena
+        org.bukkit.Location currentLoc = player.getLocation();
+        plugin.getArenaManager().updateSpawn2(arenaName, currentLoc);
+        player.sendMessage("§aSpawn 2 for arena '" + arenaName + "' set to your current location");
+        player.sendMessage("§7Location: " + currentLoc.getBlockX() + ", " + currentLoc.getBlockY() + ", " + currentLoc.getBlockZ());
+    }
+
+    private void reloadConfig(Player player) {
+        plugin.getConfigManager().loadConfig();
+        plugin.getArenaManager().loadArenas();
+        player.sendMessage("§aConfig and arenas reloaded");
+    }
+
+    private void spectate(Player player, String playerName) {
+        player.sendMessage("§aSpectating mode - not yet implemented");
+    }
+
+    private void sendDraw(Player player) {
+        MatchHandler.Match match = plugin.getMatchHandler().getPlayerMatch(player);
+        if (match == null) {
+            player.sendMessage("§cYou are not in a match");
+            return;
+        }
+
+        Player opponent = match.player1.equals(player) ? match.player2 : match.player1;
+        plugin.getMatchHandler().sendDrawRequest(player, opponent);
+    }
+
+    private void editArena(Player player, String arenaName) {
+        player.sendMessage("§aArena '" + arenaName + "' edit mode - select new positions with wand and use /duel setarena " + arenaName);
+    }
+
+    public void storePos1(Player player, org.bukkit.Location location) {
+        String playerUUID = player.getUniqueId().toString();
+        playerPos1.put(playerUUID, location);
+        plugin.getLogger().info("Stored Pos1 for " + player.getName() + " at " + location);
+    }
+
+    public void storePos2(Player player, org.bukkit.Location location) {
+        String playerUUID = player.getUniqueId().toString();
+        playerPos2.put(playerUUID, location);
+        plugin.getLogger().info("Stored Pos2 for " + player.getName() + " at " + location);
     }
 }
