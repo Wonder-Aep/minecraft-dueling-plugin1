@@ -49,7 +49,12 @@ public class ArenaManager {
             if (arenasConfig.contains(key + ".pos1") && arenasConfig.contains(key + ".pos2")) {
                 Location pos1 = arenasConfig.getLocation(key + ".pos1");
                 Location pos2 = arenasConfig.getLocation(key + ".pos2");
-                loadedArenas.put(key, new Arena(key, pos1, pos2));
+                Location spawn1 = arenasConfig.contains(key + ".spawn1") ? arenasConfig.getLocation(key + ".spawn1") : null;
+                Location spawn2 = arenasConfig.contains(key + ".spawn2") ? arenasConfig.getLocation(key + ".spawn2") : null;
+                Arena arena = new Arena(key, pos1, pos2);
+                if (spawn1 != null) arena.setSpawn1(spawn1);
+                if (spawn2 != null) arena.setSpawn2(spawn2);
+                loadedArenas.put(key, arena);
             }
         }
 
@@ -65,8 +70,51 @@ public class ArenaManager {
 
         try {
             arenasConfig.save(arenasFile);
-            loadedArenas.put(arenaName, new Arena(arenaName, pos1, pos2));
+            Arena arena = new Arena(arenaName, pos1, pos2);
+            loadedArenas.put(arenaName, arena);
             plugin.getLogger().info("Arena '" + arenaName + "' saved successfully");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Updates spawn1 location for an arena
+     */
+    public void updateSpawn1(String arenaName, Location spawn1) {
+        Arena arena = getArena(arenaName);
+        if (arena == null) {
+            plugin.getLogger().warning("Arena '" + arenaName + "' not found");
+            return;
+        }
+
+        arena.setSpawn1(spawn1);
+        arenasConfig.set(arenaName + ".spawn1", spawn1);
+
+        try {
+            arenasConfig.save(arenasFile);
+            plugin.getLogger().info("Spawn1 for arena '" + arenaName + "' updated");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Updates spawn2 location for an arena
+     */
+    public void updateSpawn2(String arenaName, Location spawn2) {
+        Arena arena = getArena(arenaName);
+        if (arena == null) {
+            plugin.getLogger().warning("Arena '" + arenaName + "' not found");
+            return;
+        }
+
+        arena.setSpawn2(spawn2);
+        arenasConfig.set(arenaName + ".spawn2", spawn2);
+
+        try {
+            arenasConfig.save(arenasFile);
+            plugin.getLogger().info("Spawn2 for arena '" + arenaName + "' updated");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -115,11 +163,15 @@ public class ArenaManager {
         private String name;
         private Location pos1;
         private Location pos2;
+        private Location spawn1;
+        private Location spawn2;
 
         public Arena(String name, Location pos1, Location pos2) {
             this.name = name;
             this.pos1 = pos1;
             this.pos2 = pos2;
+            this.spawn1 = null;
+            this.spawn2 = null;
         }
 
         public String getName() {
@@ -132,6 +184,22 @@ public class ArenaManager {
 
         public Location getPos2() {
             return pos2;
+        }
+
+        public Location getSpawn1() {
+            return spawn1 != null ? spawn1 : pos1;
+        }
+
+        public Location getSpawn2() {
+            return spawn2 != null ? spawn2 : pos2;
+        }
+
+        public void setSpawn1(Location spawn1) {
+            this.spawn1 = spawn1;
+        }
+
+        public void setSpawn2(Location spawn2) {
+            this.spawn2 = spawn2;
         }
 
         public Location getCenter() {
