@@ -20,6 +20,7 @@ public class DuelingPlugin extends JavaPlugin {
     private ArenaManager arenaManager;
     private MatchHandler matchHandler;
     private ConfigManager configManager;
+    private DuelCommand duelCommand;
 
     @Override
     public void onEnable() {
@@ -36,15 +37,18 @@ public class DuelingPlugin extends JavaPlugin {
         
         getLogger().info("Managers initialized successfully");
 
+        // Initialize command
+        duelCommand = new DuelCommand(this);
+
         // Register commands
-        getCommand("duel").setExecutor(new DuelCommand(this));
+        getCommand("duel").setExecutor(duelCommand);
         
         // Register listeners
-        Bukkit.getPluginManager().registerEvents(new PlayerInteractionListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerInteractionListener(this, duelCommand), this);
         Bukkit.getPluginManager().registerEvents(new PlayerDeathListener(this), this);
         Bukkit.getPluginManager().registerEvents(new BlockBreakListener(this), this);
 
-        getLogger().info("§a[Dueling Plugin] Plugin enabled successfully!");
+        getLogger().info("\u00a7a[Dueling Plugin] Plugin enabled successfully!");
     }
 
     @Override
@@ -52,7 +56,7 @@ public class DuelingPlugin extends JavaPlugin {
         if (matchHandler != null) {
             matchHandler.cancelAllMatches();
         }
-        getLogger().info("§c[Dueling Plugin] Plugin disabled!");
+        getLogger().info("\u00a7c[Dueling Plugin] Plugin disabled!");
     }
 
     public static DuelingPlugin getInstance() {
@@ -69,5 +73,9 @@ public class DuelingPlugin extends JavaPlugin {
 
     public ConfigManager getConfigManager() {
         return configManager;
+    }
+
+    public DuelCommand getDuelCommand() {
+        return duelCommand;
     }
 }

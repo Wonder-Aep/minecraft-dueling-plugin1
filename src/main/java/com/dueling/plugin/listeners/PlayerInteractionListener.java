@@ -19,11 +19,11 @@ import java.util.Map;
 public class PlayerInteractionListener implements Listener {
 
     private final DuelingPlugin plugin;
-    private final Map<Player, Location> pos1 = new HashMap<>();
-    private final Map<Player, Location> pos2 = new HashMap<>();
+    private final DuelCommand duelCommand;
 
-    public PlayerInteractionListener(DuelingPlugin plugin) {
+    public PlayerInteractionListener(DuelingPlugin plugin, DuelCommand duelCommand) {
         this.plugin = plugin;
+        this.duelCommand = duelCommand;
     }
 
     @EventHandler
@@ -46,15 +46,17 @@ public class PlayerInteractionListener implements Listener {
         event.setCancelled(true);
 
         if (event.getAction().toString().contains("LEFT")) {
-            pos1.put(player, event.getClickedBlock().getLocation());
-            player.sendMessage("§a§lPos1 set at: " + event.getClickedBlock().getLocation().getBlockX() + ", " 
-                + event.getClickedBlock().getLocation().getBlockY() + ", " 
-                + event.getClickedBlock().getLocation().getBlockZ());
+            Location pos1 = event.getClickedBlock().getLocation();
+            duelCommand.storePos1(player, pos1);
+            player.sendMessage("§a§lPos1 set at: " + pos1.getBlockX() + ", " 
+                + pos1.getBlockY() + ", " 
+                + pos1.getBlockZ());
         } else if (event.getAction().toString().contains("RIGHT")) {
-            pos2.put(player, event.getClickedBlock().getLocation());
-            player.sendMessage("§a§lPos2 set at: " + event.getClickedBlock().getLocation().getBlockX() + ", " 
-                + event.getClickedBlock().getLocation().getBlockY() + ", " 
-                + event.getClickedBlock().getLocation().getBlockZ());
+            Location pos2 = event.getClickedBlock().getLocation();
+            duelCommand.storePos2(player, pos2);
+            player.sendMessage("§a§lPos2 set at: " + pos2.getBlockX() + ", " 
+                + pos2.getBlockY() + ", " 
+                + pos2.getBlockZ());
         }
     }
 }
